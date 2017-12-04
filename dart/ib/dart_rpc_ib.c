@@ -856,7 +856,7 @@ static int peer_process_send_list(struct rpc_server *rpc_s, struct node_id *peer
 /* ------------------------------------------------------------------
   Network/Device/IB system operation
 */
-char *ip_search(void)
+char *ip_search(void) //bug fixed
 {
 	int sfd;
 	struct ifreq ifr;
