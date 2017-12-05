@@ -797,10 +797,10 @@ static int peer_process_send_list(struct rpc_server *rpc_s, struct node_id *peer
 	//check peer->req_list
 	while(!list_empty(&peer->req_list)) {
 //uloga("posted is %d.\n", peer->req_posted);
-		if(rpc_s->com_type == 1 || peer->req_posted > 100) {
+		if(rpc_s->com_type == 1 || peer->req_posted > 100) { //rpc_s->com_type==1 means DART_CLIENT
 			for(i = 0; i < 10; i++)	//performance here
 			{
-				err = rpc_process_event_with_timeout(rpc_s, 1);
+				err = rpc_process_event_with_timeout(rpc_s, 1); //performance is the timeout number, reduce from 100 to 1
 				//if(err == -ETIME)
 				//break;
 				//if ((rpc_s->com_type == 1) && (err == 0))
@@ -1802,7 +1802,8 @@ static int __process_event(struct rpc_server *rpc_s, int timeout)	//Done
 	if(j == 0)
 		return 0;
 
-	err = poll(my_pollfd, j, timeout);
+	err = poll(my_pollfd, j, timeout); //poll() is rpc function
+	//http://pubs.opengroup.org/onlinepubs/009695399/functions/poll.html
 
 //        uloga("%d %d %d\n",rpc_s->ptlmap.id,rpc_s->cur_num_peer,j);
 

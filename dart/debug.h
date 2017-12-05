@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+//#define TIMING_PERF
+
 #ifdef NODEBUG
 #define ulog(f, a...)
 #else

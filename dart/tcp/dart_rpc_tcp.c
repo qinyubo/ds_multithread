@@ -361,12 +361,16 @@ static int rpc_process_cmd(struct rpc_server *rpc_s, struct rpc_cmd *cmd) {
     ulog("[%s]: peer %d (%s) will process RPC command %d from %d.\n", __func__,
         rpc_s->ptlmap.id, rpc_s->cmp_type == DART_SERVER ? "server" : "client", (int)cmd->cmd, cmd->id);
     int i;
+
+
     for (i = 0; i < num_service; ++i) {
         if (cmd->cmd == rpc_commands[i].rpc_cmd) {
             if (rpc_commands[i].rpc_func(rpc_s, cmd) < 0) {
                 uloga("[%s]: call RPC command function failed!\n", __func__);
                 goto err_out;
             }
+            //Test call rpc_func
+            //rpc_commands[30].rpc_func(rpc_s, cmd);
             break;
         }
     }
@@ -415,6 +419,7 @@ int rpc_process_event(struct rpc_server *rpc_s) {
             /* Not connected yet, no need for processing event */
             continue;
         }
+        //uloga("%s(): num_peers=%d\n", __func__, rpc_s->num_peers);
 
         if (rpc_process_event_peer(rpc_s, peer) < 0) {
             uloga("[%s]: process event for peer %d failed, skip!\n", __func__, peer->ptlmap.id);

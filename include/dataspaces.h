@@ -204,6 +204,11 @@ int dspaces_put (const char *var_name,
         int ndim, uint64_t *lb, uint64_t *ub, 
         const void *data); 
 
+int dspaces_put_test (const char *var_name,
+        unsigned int ver, int size,
+        int ndim, uint64_t *lb, uint64_t *ub, 
+        const void *data); 
+
 /**
  * @brief Query the space to retrieve data specified by a geometric descriptor.
  *

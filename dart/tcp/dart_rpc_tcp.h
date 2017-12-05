@@ -203,7 +203,7 @@ enum cmd_type {
     cp_barrier,
     cp_lock,
     /* Shared spaces specific. */
-    ss_obj_put,
+    ss_obj_put,  //#15
     ss_obj_update,
     ss_obj_get_dht_peers,
     ss_obj_get_desc,
@@ -237,7 +237,11 @@ enum cmd_type {
 #endif
     /* Added for CCGrid Demo. */
     CN_TIMING_AVG,
-    _CMD_COUNT
+    _CMD_COUNT,
+    //Yube test RPC function call
+    test_1, //30
+    test_2   //31
+
 };
 
 enum lock_type {

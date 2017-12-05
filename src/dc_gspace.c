@@ -42,6 +42,7 @@
 #include "ss_data.h"
 
 
+
 #define DC_WAIT_COMPLETION(x)                                   \
         do {                                                    \
                 err = dc_process(dcg->dc);                      \
@@ -798,7 +799,7 @@ static int dcg_lock_request(struct dcg_lock *lock, enum lock_type type)
 
 /* 
    RPC routine to implement a locking service. This receives only lock
-   acks.
+   acks. Call from server, when lock been granted
 */
 static int dcgrpc_lock_service(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
 {
@@ -1433,9 +1434,27 @@ static int dcg_obj_assemble(struct query_tran_entry *qte, struct obj_data *od)
 */
 static int obj_put_completion(struct rpc_server *rpc_s, struct msg_buf *msg)
 {
+        //struct obj_data *od = msg->private;
+
+        (*msg->sync_op_id) = 1;
+
+        //uloga("%s(): timer=%f\n", __func__,timer_timestamp());
+
+       // obj_data_free(od);
+        free(msg);
+
+        dcg_dec_pending();
+        return 0;
+}
+
+//Yubo test RPC call
+static int obj_put_completion_1(struct rpc_server *rpc_s, struct msg_buf *msg)
+{
         struct obj_data *od = msg->private;
 
         (*msg->sync_op_id) = 1;
+
+        //uloga("%s(): timer=%f\n", __func__,timer_timestamp());
 
         obj_data_free(od);
         free(msg);
@@ -1525,7 +1544,7 @@ struct dcg_space *dcg_alloc(int num_nodes, int appid, void* comm)
         rpc_add_service(ss_code_reply, dcgrpc_code_reply);
 #endif
         /* Added for ccgrid demo. */
-        rpc_add_service(CN_TIMING_AVG, dcgrpc_collect_timing);	
+      //  rpc_add_service(CN_TIMING_AVG, dcgrpc_collect_timing);	
 	
         dcg_l->dc = dc_alloc(num_nodes, appid, dcg_l, comm);
         if (!dcg_l->dc) {
@@ -1584,12 +1603,14 @@ int dcg_obj_put(struct obj_data *od)
         int sync_op_id;
         int err = -ENOMEM;
 
-        if (flag_set_mpi_rank) {
+        if (flag_set_mpi_rank) {//so far, flag_set_mpi_rank set to be false all the sime
             int peer_id = mpi_rank % dcg->dc->num_sp;
             peer = dc_get_peer(dcg->dc, peer_id);
         } else {
-            peer = dcg_which_peer();
+            peer = dcg_which_peer(); //always go here
         }
+
+        //uloga("%s(): myrank=%d, put to peer_id=%d \n", __func__, mpi_rank, mpi_rank%dcg->dc->num_sp);
 
         sync_op_id = syncop_next();
 
@@ -1612,6 +1633,7 @@ int dcg_obj_put(struct obj_data *od)
         memcpy(&hdr->gdim, &od->gdim, sizeof(struct global_dimension));
 
         err = rpc_send(dcg->dc->rpc_s, peer, msg);
+        //uloga("%s(): timer=%f\n", __func__, timer_timestamp());
         if (err < 0) {
                 free(msg);
                 goto err_out;
@@ -1624,6 +1646,62 @@ int dcg_obj_put(struct obj_data *od)
         uloga("'%s()': failed with %d.\n", __func__, err);
         return err;
 }
+
+
+int dcg_obj_test(struct obj_data *od)
+{
+        struct msg_buf *msg;
+        struct node_id *peer;
+        struct hdr_obj_put *hdr; 
+        int sync_op_id;
+        int err = -ENOMEM;
+
+        if (flag_set_mpi_rank) {//so far, flag_set_mpi_rank set to be false all the sime
+            int peer_id = mpi_rank % dcg->dc->num_sp;
+            peer = dc_get_peer(dcg->dc, peer_id);
+        } else {
+            peer = dcg_which_peer(); //always go here
+        }
+
+        //uloga("%s(): myrank=%d, put to peer_id=%d \n", __func__, mpi_rank, mpi_rank%dcg->dc->num_sp);
+
+        sync_op_id = syncop_next();
+
+        msg = msg_buf_alloc(dcg->dc->rpc_s, peer, 1);
+        if (!msg)
+                goto err_out;
+
+        msg->msg_data = od->data;
+        msg->size = obj_data_size(&od->obj_desc);
+        msg->cb = obj_put_completion_1;
+        msg->private = od;
+
+        msg->sync_op_id = syncop_ref(sync_op_id);
+
+        msg->msg_rpc->cmd = test_1;
+        msg->msg_rpc->id = DCG_ID; // dcg->dc->self->id;
+
+        hdr = msg->msg_rpc->pad;
+        hdr->odsc = od->obj_desc;
+        memcpy(&hdr->gdim, &od->gdim, sizeof(struct global_dimension));
+
+        err = rpc_send(dcg->dc->rpc_s, peer, msg);
+        //uloga("%s(): timer=%f\n", __func__, timer_timestamp());
+        if (err < 0) {
+                free(msg);
+                goto err_out;
+        }
+
+        dcg_inc_pending();
+
+        return sync_op_id;
+ err_out:
+        uloga("'%s()': failed with %d.\n", __func__, err);
+        return err;
+}
+
+
+
 
 /* 
    Register a region for continuous queries and return the transaction
@@ -2130,6 +2208,7 @@ int dcg_lock_on_write(const char *lock_name, void *comm)
 	struct dcg_lock *lock;
 	int err = -ENOMEM;
 	int myid, app_minid;
+    int mysize;
 
 	lock = lock_get(lock_name, 1);
 	if (!lock)
@@ -2143,9 +2222,18 @@ int dcg_lock_on_write(const char *lock_name, void *comm)
 		app_minid = 0;
 	}
 
+
+    //Testing lock request
+    MPI_Comm_size(*(MPI_Comm *)comm, &mysize);
+    uloga("%s(): mysize=%d, myid=%d \n", __func__, mysize, myid);
+
+
+
+
 	if (myid == app_minid) {
 		/* I am the master peer for this app job. */
 		err = dcg_lock_request(lock, lk_write_get);
+        uloga("%s() myid=%d has requested lock \n", __func__, myid);
 		if (err < 0)
 			goto err_out;
 

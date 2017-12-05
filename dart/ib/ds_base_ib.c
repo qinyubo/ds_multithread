@@ -1035,7 +1035,7 @@ struct dart_server *ds_alloc(int num_sp, int num_cp, void *dart_ref, void *comm)
 	ds = calloc(1, size);
 	if(!ds)
 		goto err_out;
-	ds->dart_ref = dart_ref;
+	ds->dart_ref = dart_ref; //refer to dataspaces server
 	if(comm) {
 		ds->comm = malloc(sizeof(*ds->comm));
 		err = MPI_Comm_dup(*(MPI_Comm *) comm, ds->comm);

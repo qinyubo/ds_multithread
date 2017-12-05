@@ -154,6 +154,7 @@ if(DEBUG_OPT){
 		sprintf(var_name, "mnd_%d", i);
 		common_put(var_name, ts, elem_size, dims, lb, ub,
 			data_tab[i], type);
+		uloga("%s(): system time=%f\n",__func__,timer_read(&timer_));
 		if(type == USE_DSPACES){
 			common_put_sync(type);
 		}

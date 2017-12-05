@@ -2035,6 +2035,20 @@ static int dsgrpc_ss_info(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
 	ERROR_TRACE();
 }
 
+
+static int dsgrpc_test_1(struct rpc_server *rpc_s, struct rpc_cmd *cmd){
+
+    uloga("%s(): in ds_gspace, Test_1\n", __func__);
+
+    return 0;
+}
+
+static int dsgrpc_test_2(struct rpc_server *rpc_s, struct rpc_cmd *cmd){
+
+    uloga("%s(): in ds_gspace, Test_2\n", __func__);
+
+    return 0;
+}
 /*
   Public API starts here.
 */
@@ -2100,6 +2114,9 @@ struct ds_gspace *dsg_alloc(int num_sp, int num_cp, char *conf_name, void *comm)
         rpc_add_service(cp_lock, dsgrpc_lock_service);
         rpc_add_service(cp_remove, dsgrpc_remove_service);
         rpc_add_service(ss_info, dsgrpc_ss_info);
+        //Yubo test RPC function call
+        rpc_add_service(test_1, dsgrpc_test_1);
+        rpc_add_service(test_2, dsgrpc_test_2);
 #ifdef DS_HAVE_ACTIVESPACE
         rpc_add_service(ss_code_put, dsgrpc_bin_code_put);
 #endif

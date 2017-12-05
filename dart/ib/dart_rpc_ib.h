@@ -309,7 +309,7 @@ struct rpc_server {
 	enum rpc_component com_type;
 	int cur_num_peer;
 
-	int num_qp;
+	int num_qp;  //qp stand for Queue Pair
 
 	pthread_t comm_thread;
 	int thread_alive;
