@@ -152,11 +152,14 @@ if(DEBUG_OPT){
 
 	for(i = 0; i < num_vars; i++){
 		sprintf(var_name, "mnd_%d", i);
+		//uloga("%s(Yubo): before common_put timestamp:%f\n", __func__, timer_timestamp());
 		common_put(var_name, ts, elem_size, dims, lb, ub,
 			data_tab[i], type);
-		uloga("%s(): system time=%f\n",__func__,timer_read(&timer_));
+		//uloga("%s(): system time=%f\n",__func__,timer_read(&timer_));
 		if(type == USE_DSPACES){
+			//uloga("%s(Yubo): before common_put_sync timestamp:%f\n", __func__, timer_timestamp());
 			common_put_sync(type);
+			uloga("%s(Yubo): after common_put_sync timestamp:%f\n", __func__, timer_timestamp());
 		}
 	}
 	tm_end = timer_read(&timer_);
@@ -203,7 +206,7 @@ int test_put_run(enum transport_type type, int npapp, int ndims, int* npdim,
 	}
 
 	timer_init(&timer_, 1);
-        timer_start(&timer_);
+    timer_start(&timer_);
 
 	int app_id = appid;
 	double tm_st, tm_end;

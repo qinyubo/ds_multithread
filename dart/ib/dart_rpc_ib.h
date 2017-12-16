@@ -259,7 +259,8 @@ struct msg_buf {
 	void *private;
 
 	// Peer I should send this message to.
-	const struct node_id *peer;
+	//const struct node_id *peer;
+	struct node_id *peer;
 };
 
 /* Struct to represent the connection*/
@@ -411,7 +412,8 @@ enum cmd_type {
 	//Added for CCGrid Demo
 	CN_TIMING_AVG,
 	_CMD_COUNT,
-	cn_s_unregister
+	cn_s_unregister,
+	ds_put_completion //Yubo
 };
 
 enum lock_type {

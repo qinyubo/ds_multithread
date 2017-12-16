@@ -49,6 +49,23 @@
 
 #define DSG_ID                  dsg->ds->self->ptlmap.id
 
+
+/* Function to get and return the current (wall clock) time. */
+double timer_timestamp_2(void)
+{
+        double ret;
+
+#ifdef XT3
+        ret = dclock();
+#else
+        struct timeval tv;
+
+        gettimeofday( &tv, 0 );
+        ret = (double) tv.tv_usec + tv.tv_sec * 1.e6;
+#endif
+        return ret;
+}
+
 struct cont_query {
         int                     cq_id;
         int                     cq_rank;
@@ -1264,12 +1281,36 @@ if(DEBUG_OPT){
 
 /*
 */
-static int obj_put_completion(struct rpc_server *rpc_s, struct msg_buf *msg)
+static int obj_put_completion_ds(struct rpc_server *rpc_s, struct msg_buf *msg) //modify to understand callback function Yubo
 {
     struct obj_data *od = msg->private;
+    struct msg_buf *msg_ds;
+    int err = -ENOMEM;
+    struct node_id *peer_ds;
+
+
     ls_add_obj(dsg->ls, od);
+   
+
+    peer_ds = (struct node_id*)msg->peer;
+
+    msg_ds = msg_buf_alloc(rpc_s, peer_ds, 1);
+
+    msg_ds->msg_rpc->cmd = ds_put_completion;
+    msg_ds->msg_rpc->id = DSG_ID;
+   
+    err = rpc_send(rpc_s, peer_ds, msg_ds);
+    
+
+    if (err < 0){
+        free(msg_ds);
+        uloga("%s(Yubo): rpc_send fail from ds_put_completion\n",__func__);
+
+    }
 
     free(msg);
+    //free(msg_ds);
+
 #ifndef NODEBUG  
 if(DEBUG_OPT){
     uloga("'%s()': server %d finished receiving  %s, version %d.\n",
@@ -1309,7 +1350,9 @@ static int dsgrpc_obj_put(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
         msg->msg_data = od->data;
         msg->size = obj_data_size(&od->obj_desc);
         msg->private = od;
-        msg->cb = obj_put_completion;
+        msg->cb = obj_put_completion_ds;  //Yubo
+        //adding peer to msg Yubo
+        msg->peer = peer; 
 
 #ifndef NODEBUG
 if(DEBUG_OPT){
@@ -1317,17 +1360,22 @@ if(DEBUG_OPT){
             __func__, DSG_ID, odsc->name, odsc->version);
 }
 #endif
+        
         rpc_mem_info_cache(peer, msg, cmd); 
+        uloga("%s(Yubo): before rpc_receive_direct timestamp=%f\n", __func__, timer_timestamp_2());
         err = rpc_receive_direct(rpc_s, peer, msg);
+        //uloga("%s(Yubo): after rpc_receive_direct timestamp=%f\n", __func__, timer_timestamp_2());
         rpc_mem_info_reset(peer, msg, cmd);
+        
 
         if (err < 0)
                 goto err_free_msg;
 
 	/* NOTE: This  early update, has  to be protected  by external
 	   locks in the client code. */
-
+        //uloga("%s(Yubo): before obj_put_update_dht timestamp=%f\n", __func__, timer_timestamp_2());
         err = obj_put_update_dht(dsg, od);
+        uloga("%s(Yubo): after obj_put_update_dht timestamp=%f\n", __func__, timer_timestamp_2());
         if (err == 0)
 	        return 0;
  err_free_msg:
@@ -1935,10 +1983,13 @@ if(DEBUG_OPT){
         msg->cb = obj_get_completion;
         msg->private = od;
 
-
+        
         rpc_mem_info_cache(peer, msg, cmd); 
+        uloga("%s(Yubo): before rpc_send_direct timestamp:%f\n", __func__, timer_timestamp_2());
         err = (fast_v)? rpc_send_directv(rpc_s, peer, msg) : rpc_send_direct(rpc_s, peer, msg);
+        uloga("%s(Yubo): after rpc_send_direct timestamp:%f\n", __func__, timer_timestamp_2());
         rpc_mem_info_reset(peer, msg, cmd);
+
         if (err == 0)
                 return 0;
 
@@ -2114,9 +2165,9 @@ struct ds_gspace *dsg_alloc(int num_sp, int num_cp, char *conf_name, void *comm)
         rpc_add_service(cp_lock, dsgrpc_lock_service);
         rpc_add_service(cp_remove, dsgrpc_remove_service);
         rpc_add_service(ss_info, dsgrpc_ss_info);
-        //Yubo test RPC function call
-        rpc_add_service(test_1, dsgrpc_test_1);
-        rpc_add_service(test_2, dsgrpc_test_2);
+        //Yubo test RPC function call (TCP)
+        //rpc_add_service(test_1, dsgrpc_test_1);
+        //rpc_add_service(test_2, dsgrpc_test_2);
 #ifdef DS_HAVE_ACTIVESPACE
         rpc_add_service(ss_code_put, dsgrpc_bin_code_put);
 #endif
@@ -2216,7 +2267,7 @@ int dsghlp_obj_put(struct ds_gspace *dsg, struct obj_data *od)
                 goto err_out;
 
         msg->private = od;
-        err = obj_put_completion(dsg->ds->rpc_s, msg);
+        err = obj_put_completion_ds(dsg->ds->rpc_s, msg);
         if (err == 0)
                 return 0;
 

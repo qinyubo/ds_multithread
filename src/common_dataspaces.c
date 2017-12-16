@@ -362,7 +362,8 @@ int common_dspaces_put_test(const char *var_name,
         set_global_dimension(&dcg->gdim_list, var_name, &dcg->default_gdim,
                              &od->gdim); 
 
-        err = dcg_obj_test(od); //Yubo test RPC call
+        //err = dcg_obj_test(od); //Yubo test RPC call
+        err = dcg_obj_put(od);
         if (err < 0 ) {
             obj_data_free(od);
             uloga("'%s()': failed with %d, can not put data object.\n", 

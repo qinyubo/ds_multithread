@@ -127,6 +127,23 @@ struct dcg_lock {
 	char			name[LOCK_NAME_SIZE];
 };
 
+/*timer*/
+/* Function to get and return the current (wall clock) time. */
+double timer_timestamp_1(void)
+{
+        double ret;
+
+#ifdef XT3
+        ret = dclock();
+#else
+        struct timeval tv;
+
+        gettimeofday( &tv, 0 );
+        ret = (double) tv.tv_usec + tv.tv_sec * 1.e6;
+#endif
+        return ret;
+}
+
 /* 
    Some operations  may require synchronizing API;  use this structure
    as a temporary hack to implement synchronization. 
@@ -673,8 +690,12 @@ static inline struct node_id * dcg_which_peer(void)
         int peer_id;
         struct node_id *peer;
 
+        
         peer_id = dcg->dc->self->ptlmap.id % dcg->dc->num_sp;
         peer = dc_get_peer(dcg->dc, peer_id);
+        //uloga("%s():dcg->dc->self->ptlmap.id=%d, dcg->dc->num_sp=%d, peer_id=%d\n", __func__, \
+            dcg->dc->self->ptlmap.id, dcg->dc->num_sp, peer_id);
+        
 
         return peer;
 }
@@ -1432,13 +1453,14 @@ static int dcg_obj_assemble(struct query_tran_entry *qte, struct obj_data *od)
 /*
   Free resources after 'dcg_obj_put()' inserts an object in the space.
 */
-static int obj_put_completion(struct rpc_server *rpc_s, struct msg_buf *msg)
+static int obj_put_completion_dc(struct rpc_server *rpc_s, struct msg_buf *msg) //modify to understand callback function Yubo
 {
         //struct obj_data *od = msg->private;
 
+
         (*msg->sync_op_id) = 1;
 
-        //uloga("%s(): timer=%f\n", __func__,timer_timestamp());
+        uloga("%s(Yubo): callback timer=%f\n", __func__,timer_timestamp_1());
 
        // obj_data_free(od);
         free(msg);
@@ -1512,6 +1534,19 @@ static int dcgrpc_time_log(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
         return 0;
 }
 
+
+static int dcgrpc_print_completion(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
+{
+
+    uloga("%s(Yubo): received rpc call from server put completion\n", __func__);
+
+    return 0;
+
+
+}
+
+
+
 /*
   Public API starts here.
 */
@@ -1540,6 +1575,8 @@ struct dcg_space *dcg_alloc(int num_nodes, int appid, void* comm)
         rpc_add_service(cp_lock, dcgrpc_lock_service);
         rpc_add_service(cn_timing, dcgrpc_time_log);
         rpc_add_service(ss_info, dcgrpc_ss_info);
+        //Yubo add to receive ds_put_completion call
+        rpc_add_service(ds_put_completion, dcgrpc_print_completion);
 #ifdef DS_HAVE_ACTIVESPACE
         rpc_add_service(ss_code_reply, dcgrpc_code_reply);
 #endif
@@ -1620,7 +1657,7 @@ int dcg_obj_put(struct obj_data *od)
 
         msg->msg_data = od->data;
         msg->size = obj_data_size(&od->obj_desc);
-        msg->cb = obj_put_completion;
+        msg->cb = obj_put_completion_dc;
         msg->private = od;
 
         msg->sync_op_id = syncop_ref(sync_op_id);
@@ -1631,6 +1668,8 @@ int dcg_obj_put(struct obj_data *od)
         hdr = msg->msg_rpc->pad;
         hdr->odsc = od->obj_desc;
         memcpy(&hdr->gdim, &od->gdim, sizeof(struct global_dimension));
+
+        uloga("%s(Yubo): before rpc_send timestamp: %f\n", __func__, timer_timestamp_1());
 
         err = rpc_send(dcg->dc->rpc_s, peer, msg);
         //uloga("%s(): timer=%f\n", __func__, timer_timestamp());
@@ -1648,6 +1687,7 @@ int dcg_obj_put(struct obj_data *od)
 }
 
 
+/*
 int dcg_obj_test(struct obj_data *od)
 {
         struct msg_buf *msg;
@@ -1699,7 +1739,7 @@ int dcg_obj_test(struct obj_data *od)
         uloga("'%s()': failed with %d.\n", __func__, err);
         return err;
 }
-
+*/
 
 
 
@@ -1866,8 +1906,9 @@ int dcg_obj_get(struct obj_data *od)
         tm_st = tm_end;
 #endif
 
-
+        uloga("%s(Yubo): before dcg_obj_data_get timestamp:%f\n", __func__, timer_timestamp_1());
         err = dcg_obj_data_get(qte);
+        uloga("%s(Yubo): after dcg_obj_data_get timestamp:%f\n", __func__, timer_timestamp_1());
         if (err < 0) {
                 // FIXME: should I jump to err_qt_free ?
                 qt_free_obj_data(qte, 1);
@@ -1895,8 +1936,9 @@ int dcg_obj_get(struct obj_data *od)
                 err = -ENODATA;
                 goto out_no_data;
         }
-
+        uloga("%s(Yubo): before dcg_obj_assemble timestamp:%f\n", __func__, timer_timestamp_1());
         err = dcg_obj_assemble(qte, od);
+        uloga("%s(Yubo): after dcg_obj_assemble timestamp:%f\n", __func__, timer_timestamp_1());
 #ifdef TIMING_PERF
         tm_end = timer_read(&tm_perf);
         uloga("TIMING_PERF fetch_data ts %d peer %d time %lf %s\n",

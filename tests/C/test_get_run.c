@@ -134,8 +134,9 @@ if(DEBUG_OPT){
 
 	for(i = 0; i < num_vars; i++){
 		sprintf(var_name, "mnd_%d", i);
-		common_get(var_name, ts, elem_size, dims, lb, ub,
-			data_tab[i], type);
+		uloga("%s(Yubo): before common_get timestamp:%f\n", __func__, timer_timestamp());
+		common_get(var_name, ts, elem_size, dims, lb, ub,data_tab[i], type);
+		uloga("%s(Yubo): after common_get timestamp:%f\n", __func__, timer_timestamp());
 	}
 	tm_end = timer_read(&timer_);
 	common_unlock_on_read("mnd_lock", &gcomm_);

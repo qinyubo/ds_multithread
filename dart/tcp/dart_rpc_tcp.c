@@ -7,12 +7,29 @@
 
 #include "dart_rpc_tcp.h"
 #include "debug.h"
+#include <sys/time.h> //yubo
+//#include "../../include/timer.h"
 
 /* It may be better to store these values in rpc_server struct */
 /* Best size of bytes to be written in a single socket write call */
 static uint64_t socket_best_write_size = 16384;
 /* Best size of bytes to be read in a single socket read call */
 static uint64_t socket_best_read_size = 87380;
+
+double timer_timestamp_0(void)
+{
+        double ret;
+
+#ifdef XT3
+        ret = dclock();
+#else
+        struct timeval tv;
+
+        gettimeofday( &tv, 0 );
+        ret = (double) tv.tv_usec + tv.tv_sec * 1.e6;
+#endif
+        return ret;
+}
 
 static uint64_t str_to_uint64(const char *s) {
     uint64_t res = 0;
@@ -358,13 +375,15 @@ int rpc_connect(struct rpc_server *rpc_s, struct node_id *peer) {
 }
 
 static int rpc_process_cmd(struct rpc_server *rpc_s, struct rpc_cmd *cmd) {
-    ulog("[%s]: peer %d (%s) will process RPC command %d from %d.\n", __func__,
-        rpc_s->ptlmap.id, rpc_s->cmp_type == DART_SERVER ? "server" : "client", (int)cmd->cmd, cmd->id);
+    ulog("peer %d (%s) received RPC command %d from %d at time=%f\n",
+        rpc_s->ptlmap.id, rpc_s->cmp_type == DART_SERVER ? "server" : "client", (int)cmd->cmd, cmd->id, timer_timestamp_1());
     int i;
 
-
+     uloga("%s() before peer %d process rpc_cmd=%d at time=%f\n", __func__, cmd->id, cmd->cmd, timer_timestamp_1());
     for (i = 0; i < num_service; ++i) {
         if (cmd->cmd == rpc_commands[i].rpc_cmd) {
+            //uloga("%s(): peer %d received rpc_cmd=%d from peer %d at time=%f\n",\
+             __func__, cmd->cmd, timer_timestamp_1());
             if (rpc_commands[i].rpc_func(rpc_s, cmd) < 0) {
                 uloga("[%s]: call RPC command function failed!\n", __func__);
                 goto err_out;
@@ -374,6 +393,8 @@ static int rpc_process_cmd(struct rpc_server *rpc_s, struct rpc_cmd *cmd) {
             break;
         }
     }
+    uloga("%s() after peer %d process rpc_cmd=%d at time=%f\n", __func__, cmd->id, cmd->cmd, timer_timestamp_1());
+    
     if (i == num_service) {
         uloga("[%s]: unknown RPC command %d!\n", __func__, (int)cmd->cmd);
         goto err_out;
@@ -389,6 +410,9 @@ static int rpc_process_event_peer(struct rpc_server *rpc_s, struct node_id *peer
     while (1) {
         struct rpc_cmd cmd;
         int ret = socket_recv_rpc_cmd(peer->sockfd, &cmd);
+        //if(cmd.cmd > 0 && cmd.cmd < 31){
+        //uloga("%s(): received rpc_cmd=%d, time=%f\n", __func__, cmd.cmd, timer_timestamp_1());
+        //}
         if (ret < 0) {
             uloga("[%s]: receive RPC command from peer %d failed!\n", __func__, peer->ptlmap.id);
             goto err_out;
@@ -399,11 +423,14 @@ static int rpc_process_event_peer(struct rpc_server *rpc_s, struct node_id *peer
         }
 
         /* It is more convenient to set id here */
+        uloga("%s() received rpc_cmd=%d\n",__func__, cmd.cmd);
+       
         cmd.id = peer->ptlmap.id;
         if (rpc_process_cmd(rpc_s, &cmd) < 0) {
             uloga("[%s]: process RPC command failed!\n", __func__);
             goto err_out;
         }
+        
     }
     return 0;
 
@@ -425,6 +452,40 @@ int rpc_process_event(struct rpc_server *rpc_s) {
             uloga("[%s]: process event for peer %d failed, skip!\n", __func__, peer->ptlmap.id);
             continue;
         }
+    }
+    return 0;
+}
+
+int rpc_process_event_mt(struct rpc_server *rpc_s) {
+    int i;
+     
+    if (rpc_s->num_peers == 2) {
+        struct node_id *peer_1 = &rpc_s->peer_tab[0];
+        struct node_id *peer_2 = &rpc_s->peer_tab[1];
+        
+        uloga("%s(): in here\n", __func__);
+
+        /*
+        if (!peer_1->f_connected) {
+            
+            continue;
+        }
+        if (!peer_2->f_connected) {
+           
+            continue;
+        }
+        */
+        //uloga("%s(): num_peers=%d\n", __func__, rpc_s->num_peers);
+    if(peer_1->f_connected && peer_2->f_connected){
+        if (rpc_process_event_peer(rpc_s, peer_1) < 0) {
+            uloga("[%s]: process event for peer %d failed, skip!\n", __func__, peer_1->ptlmap.id);
+            //continue;
+        }
+        if (rpc_process_event_peer(rpc_s, peer_2) < 0) {
+            uloga("[%s]: process event for peer %d failed, skip!\n", __func__, peer_2->ptlmap.id);
+            //continue;
+        }
+    }
     }
     return 0;
 }
@@ -484,6 +545,11 @@ static int peer_process_send_list(struct rpc_server *rpc_s, struct node_id *peer
         struct rpc_request *request = list_entry(peer->req_list.next, struct rpc_request, req_entry);
         request->msg->msg_rpc->id = rpc_s->ptlmap.id;
         list_del(&request->req_entry);
+
+        //uloga("%s(): send request to peer at time=%d\n", __func__, (int)time(NULL)); //Yubo add timer, print timestamp
+        uloga("%s(): peer %d send request rpc_cmd=%d to peer %d at time=%f\n", __func__, \
+            request->msg->msg_rpc->id, request->msg->msg_rpc->cmd, peer->ptlmap.id, timer_timestamp_1());
+    
 
         if (rpc_post_request(rpc_s, peer, request) < 0) {
             uloga("[%s]: post RPC request for peer %d failed!\n", __func__, peer->ptlmap.id);

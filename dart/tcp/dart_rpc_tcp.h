@@ -190,7 +190,7 @@ enum cmd_type {
     cn_init_read,
     cn_read,
     cn_large_file, 
-    cn_register, 
+    cn_register, //#5 
     cn_route, 
     cn_unregister,
     cn_resume_transfer,     /* Hint for server to start async transfers. */
@@ -201,19 +201,19 @@ enum cmd_type {
     cn_timing,
     /* Synchronization primitives. */
     cp_barrier,
-    cp_lock,
+    cp_lock,  //#15
     /* Shared spaces specific. */
-    ss_obj_put,  //#15
+    ss_obj_put,  
     ss_obj_update,
     ss_obj_get_dht_peers,
     ss_obj_get_desc,
-    ss_obj_query,
+    ss_obj_query, //#20
     ss_obj_cq_register,
     ss_obj_cq_notify,
     ss_obj_get,
     ss_obj_filter,
     ss_obj_info,
-    ss_info,
+    ss_info,  //#26
     cp_remove,
 #ifdef DS_HAVE_ACTIVESPACE
     ss_code_put,
@@ -305,6 +305,7 @@ int rpc_write_config(struct rpc_server *rpc_s, const char *filename);
 int rpc_read_config(struct sockaddr_in *address, const char *filename);
 int rpc_connect(struct rpc_server *rpc_s, struct node_id *peer);
 int rpc_process_event(struct rpc_server *rpc_s);
+int rpc_process_event_mt(struct rpc_server *rpc_s);  //Yubo multithreading
 int rpc_barrier(struct rpc_server *rpc_s, void *comm);
 int rpc_send(struct rpc_server *rpc_s, struct node_id *peer, struct msg_buf *msg);
 int rpc_send_direct(struct rpc_server *rpc_s, struct node_id *peer, struct msg_buf *msg);
