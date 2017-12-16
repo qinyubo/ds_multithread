@@ -151,6 +151,7 @@ struct rpc_cmd {
 	unsigned int id;
 	struct ibv_mr mr;
 	int qp_num;
+	int* sync_comp_ptr; //Yubo store client sync structure pointer
 	// payload of the command 
 	unsigned char pad[RPC_CMD_PAD_SIZE];
 	uint64_t wr_id;
@@ -246,7 +247,7 @@ struct msg_buf {
 	int refcont;
 
 	// Ref to flag used for synchronization. 
-	int *sync_op_id;
+	int *sync_op_id; 
 
 	// Callback to customize completion; by default frees memory. 
 	completion_callback cb;
@@ -260,7 +261,7 @@ struct msg_buf {
 
 	// Peer I should send this message to.
 	//const struct node_id *peer;
-	struct node_id *peer;
+	const struct node_id *peer;
 };
 
 /* Struct to represent the connection*/

@@ -1290,6 +1290,8 @@ static int obj_put_completion_ds(struct rpc_server *rpc_s, struct msg_buf *msg) 
 
 
     ls_add_obj(dsg->ls, od);
+
+    sleep(8);
    
 
     peer_ds = (struct node_id*)msg->peer;
@@ -1298,9 +1300,14 @@ static int obj_put_completion_ds(struct rpc_server *rpc_s, struct msg_buf *msg) 
 
     msg_ds->msg_rpc->cmd = ds_put_completion;
     msg_ds->msg_rpc->id = DSG_ID;
+    msg_ds->msg_rpc->sync_comp_ptr = msg->sync_op_id; //client sync ds_completed[] pointer
    
+    uloga("%s(Yubo): before server send to client\n",__func__);
+    uloga("%s(Yubo): at server, the sync_op_id=%p\n",__func__,msg->sync_op_id);
+
     err = rpc_send(rpc_s, peer_ds, msg_ds);
     
+    uloga("%s(Yubo): after server send to client\n",__func__);
 
     if (err < 0){
         free(msg_ds);
@@ -1330,9 +1337,14 @@ static int dsgrpc_obj_put(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
         struct obj_data *od;
         struct node_id *peer;
         struct msg_buf *msg;
+        int* dc_sync_comp_ptr;
         int err;
 
         odsc->owner = DSG_ID;
+
+        dc_sync_comp_ptr = hdr->sync_comp_ptr; //get pointer
+
+        uloga("'%s()': server received pointer add=%p\n",__func__,dc_sync_comp_ptr);
 
         err = -ENOMEM;
         peer = ds_get_peer(dsg->ds, cmd->id);
@@ -1353,6 +1365,8 @@ static int dsgrpc_obj_put(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
         msg->cb = obj_put_completion_ds;  //Yubo
         //adding peer to msg Yubo
         msg->peer = peer; 
+        //add client sync pointer to msg sync flag
+        msg->sync_op_id = dc_sync_comp_ptr;
 
 #ifndef NODEBUG
 if(DEBUG_OPT){

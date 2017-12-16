@@ -644,7 +644,7 @@ static int rpc_cb_req_completion(struct rpc_server *rpc_s, struct ibv_wc *wc)	//
 static int rpc_prepare_buffers(struct rpc_server *rpc_s, const struct node_id *peer, struct rpc_request *rr, enum io_dir dir)	//working: TODO need 'id' information getting from initialization
 {
 	int err;
-	uloga("%s(Yubo) calling this function!\n", __func__);
+	//uloga("%s(Yubo) calling this function!\n", __func__);
 
 	rr->msg->msg_rpc->wr_id = (uintptr_t) rr;
 	rr->data_mr = ibv_reg_mr(peer->rpc_conn.pd, rr->msg->msg_data, rr->msg->size, IBV_ACCESS_LOCAL_WRITE | ((dir == io_send) ? IBV_ACCESS_REMOTE_READ : IBV_ACCESS_REMOTE_WRITE));

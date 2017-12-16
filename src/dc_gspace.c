@@ -124,6 +124,7 @@ struct dcg_lock {
         int                     req;
         int                     ack;
         int                     lock_num;
+        //int                     ds_completed; //Yubo to check if server has completed processing data
 	char			name[LOCK_NAME_SIZE];
 };
 
@@ -151,6 +152,7 @@ double timer_timestamp_1(void)
 static struct {
         int next;
         int opid[4095];
+        int ds_completed[4095]; // Yubo
 } sync_op;
 
 static struct dcg_space *dcg;
@@ -675,6 +677,7 @@ static int syncop_next(void)
                 uloga("'%s()': error sync operation overflows.\n", __func__);
         }
         sync_op.opid[n] = 0;
+        sync_op.ds_completed[n] = 0; //Yubo
         sync_op.next = (sync_op.next + 1) % num_op;
 
         return n;
@@ -684,6 +687,13 @@ static int * syncop_ref(int opid)
 {
         return &sync_op.opid[opid];
 }
+
+static int * syncds_ref(int opid) //Yubo identify if server has completed processing data
+{
+        return &sync_op.ds_completed[opid]; //ds_completed[opid] pointer;
+}
+
+
 
 static inline struct node_id * dcg_which_peer(void)
 {
@@ -1466,7 +1476,27 @@ static int obj_put_completion_dc(struct rpc_server *rpc_s, struct msg_buf *msg) 
         free(msg);
 
         dcg_dec_pending();
+        uloga("%s(Yubo): callback function is find!\n", __func__);
         return 0;
+}
+
+
+static int dcgrpc_print_completion(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
+{
+
+
+    uloga("%s(Yubo): received rpc call from server put completion\n", __func__);
+
+    uloga("%s(Yubo): Before setting sync_comp_ptr\n", __func__);
+    uloga("%s(Yubo): sync_comp_ptr=%p\n", __func__,cmd->sync_comp_ptr);
+    //set sync_op.ds_completed[n]
+    (*cmd->sync_comp_ptr) = 1;
+    uloga("%s(Yubo): After setting sync_comp_ptr\n", __func__);
+
+
+    return 0;
+
+
 }
 
 //Yubo test RPC call
@@ -1535,15 +1565,6 @@ static int dcgrpc_time_log(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
 }
 
 
-static int dcgrpc_print_completion(struct rpc_server *rpc_s, struct rpc_cmd *cmd)
-{
-
-    uloga("%s(Yubo): received rpc call from server put completion\n", __func__);
-
-    return 0;
-
-
-}
 
 
 
@@ -1650,6 +1671,7 @@ int dcg_obj_put(struct obj_data *od)
         //uloga("%s(): myrank=%d, put to peer_id=%d \n", __func__, mpi_rank, mpi_rank%dcg->dc->num_sp);
 
         sync_op_id = syncop_next();
+        //uloga("%s(Yubo): now the sync_op.opid[sync_op_id]=%d\n", __func__, sync_op.opid[sync_op_id]);
 
         msg = msg_buf_alloc(dcg->dc->rpc_s, peer, 1);
         if (!msg)
@@ -1667,7 +1689,10 @@ int dcg_obj_put(struct obj_data *od)
 
         hdr = msg->msg_rpc->pad;
         hdr->odsc = od->obj_desc;
+        hdr->sync_comp_ptr = syncds_ref(sync_op_id); //Yubo ds_completed[opid] pointer
         memcpy(&hdr->gdim, &od->gdim, sizeof(struct global_dimension));
+
+        uloga("%s(Yubo): Original pointer address=%p\n", __func__, syncds_ref(sync_op_id));
 
         uloga("%s(Yubo): before rpc_send timestamp: %f\n", __func__, timer_timestamp_1());
 
@@ -1833,14 +1858,32 @@ int dcg_obj_cq_update(int cq_id)
 int dcg_obj_sync(int sync_op_id)
 {
         int *sync_op_ref = syncop_ref(sync_op_id);
+        int *sync_comp_ptr_ref = syncds_ref(sync_op_id); //Yubo
         int err;
 
+        uloga("%s(Yubo): come into sync! \n", __func__);
+
         while (sync_op_ref[0] != 1) {
+             uloga("%s(Yubo): in sync looping! \n", __func__);
                 err = dc_process(dcg->dc);
                 if (err < 0) {
+                    uloga("%s(Yubo): in sync looping err! \n", __func__);
                         goto err_out;
                 }
         }
+
+        uloga("%s(Yubo): before sync_comp_ptr! \n", __func__);
+
+        while(sync_comp_ptr_ref[0] != 1){
+             uloga("%s(Yubo): in the sedond sync looping! \n", __func__);
+                err = dc_process(dcg->dc);
+                if (err < 0) {
+                    uloga("%s(Yubo): in sync looping err! \n", __func__);
+                        goto err_out;
+                }
+        } //keep looping
+
+        uloga("%s(Yubo): now server has completed! \n", __func__);
 
         return 0;
  err_out:
